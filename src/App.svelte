@@ -3,6 +3,8 @@
   let deck = [];
   let piles = [];
   let drawnCards = [];
+  let prognosisUsages = 0;
+  let prognosisActive = false;
   let gistId = '38d66e7e0ebabeed12db7f2642b61db4';
 
   const colorMap = {
@@ -17,7 +19,6 @@
     const data = await response.json();
     deck = [...data];
     piles = [data]
-    console.log(piles)
   }
 
   async function drawCard(name) {
@@ -37,10 +38,24 @@
 
     drawnCards = []
     piles = [...piles]
+  }
 
-    console.log(`'piles' after epidemic: ${piles}`)
-    console.log(`'deck' after epidemic: ${deck}`)
-    console.log(`'drawnCards' after epidemic: ${drawnCards}`)
+  async function handlePrognosis(name) {
+      prognosisUsages += 1
+      for (let pileIndex = piles.length - 1; pileIndex >= 0; pileIndex--) {
+        const pile = piles[pileIndex]
+        const cardIndex = pile.findIndex(card => card.name == name)
+        if (cardIndex == -1) {
+          continue
+        }
+        const prognosedCard = pile.splice(cardIndex, 1)[0]
+        piles.splice(pileIndex + 1, 0, [{...prognosedCard, prognosed: true}])
+        if (piles[pileIndex].length === 0) {
+          piles.splice(pileIndex, 1)
+        }
+        piles = [...piles]
+        break
+      }
   }
 
   async function saveToGist() {
@@ -87,7 +102,9 @@
           {#if pileIndex === 0}
           <span class="arrow" on:click={() => drawCard(card.name)}>➡️</span>
           {/if}
-
+          {#if ([...piles].reverse().slice(0, pileIndex).flatMap(cardList => [...cardList]).length + 1 <= 8) && !card.prognosed && prognosisUsages < 8 && prognosisActive}
+          <span class="arrow" on:click={() => handlePrognosis(card.name)}>📈</span>
+          {/if}
           {#if pileIndex === piles.length - 1}
             <span class="arrow" on:click={() => handleEpidemic(card.name)}>☣️</span>
           {/if}
@@ -97,6 +114,7 @@
     {/each}
   </div>
 
+  <button on:click={() => prognosisActive = !prognosisActive}>Toggle prognosis 📈</button>
 
   </div>
 
