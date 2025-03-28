@@ -1,6 +1,4 @@
 <script>
-  import { onMount } from 'svelte';
-  let deck = [];
   let piles = [];
   let drawnCards = [];
   let prognosisUsages = 0;
@@ -17,10 +15,36 @@
   }
 
   async function createNewGame() {
-    const response = await fetch(`https://gist.githubusercontent.com/eivindkopperud/${gistId}/raw/deck.json`);
+    const response = await fetch(`https://api.github.com/gists/${gistId}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `token ${import.meta.env.VITE_GITHUB_PAT}`,
+        'Content-Type': 'application/json'
+      },
+    });
     const data = await response.json();
-    deck = [...data];
-    piles = [data]
+    const content = JSON.parse(data.files["deck.json"].content)
+    piles = [content]
+    drawnCards = []
+    burnedCards = []
+    prognosisUsages = 0
+    prognosisActive = false
+  }
+
+  async function loadCurrentGame() {
+    const response = await fetch(`https://api.github.com/gists/${gistId}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `token ${import.meta.env.VITE_GITHUB_PAT}`,
+        'Content-Type': 'application/json'
+      },
+    });
+    const data = await response.json();
+    const content = JSON.parse(data.files["currentGame.json"].content)
+    piles = content.piles
+    burnedCards = content.burnedCards
+    drawnCards = content.drawnCards
+    prognosisUsages = piles.flatMap(list => [...list] ).filter(card => card.prognosed).length
   }
 
   async function drawCard(name) {
@@ -30,6 +54,8 @@
     drawnCards = [...drawnCards, pileRemoval]; // Reassign to trigger reactivity
     if (piles[piles.length - 1].length === 0) piles.pop()
     piles = [...piles]
+
+    saveToGist()
   }
 
   async function handleEpidemic(name) {
@@ -40,6 +66,8 @@
 
     drawnCards = []
     piles = [...piles]
+
+    saveToGist()
   }
 
   async function handlePrognosis(name) {
@@ -56,7 +84,8 @@
           piles.splice(pileIndex, 1)
         }
         piles = [...piles]
-        break
+        saveToGist()
+        return
       }
   }
 
@@ -67,29 +96,32 @@
       burnedCards.push(burnedCard)
       drawnCards = [...drawnCards]
       burnedCards = [...burnedCards]
+      saveToGist()
       return
     }
 
     discardIndex = piles[piles.length - 1].findIndex(card => card.name == name)
     const burnedCard = piles[piles.length -1].splice(discardIndex, 1)[0]
+    if (piles[piles.length - 1].length === 0) {
+      piles.splice(piles.length - 1, 1)
+    }
     burnedCards.push(burnedCard)
     piles = [...piles]
-    burnedCards = [...burnedCards] 
-    
+    burnedCards = [...burnedCards]
 
-
+    saveToGist()
   }
 
   async function saveToGist() {
-    const data = JSON.stringify({ deck, drawnCards });
+    const data = JSON.stringify({ piles, drawnCards, burnedCards });
     const response = await fetch(`https://api.github.com/gists/${gistId}`, {
       method: 'PATCH',
       headers: {
-        'Authorization': `token YOUR_GITHUB_TOKEN`,
+        'Authorization': `token ${import.meta.env.VITE_GITHUB_PAT}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        files: { "pandemic_data.json": { content: data } }
+        files: { "currentGame.json": { content: data } }
       })
     });
 
@@ -101,7 +133,9 @@
 <main>
   <h1>Pandemic Infection Deck Tracker</h1>
 
-  <button on:click={createNewGame}>Start nytt spill</button>
+  <button on:click={createNewGame}>Start new game</button>
+  <button on:click={loadCurrentGame}>Load current game</button>
+
 
   <div class="card-rows">
     
