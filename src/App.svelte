@@ -1,13 +1,17 @@
-<script>
-  let piles = [];
-  let drawnCards = [];
+
+<script lang="ts">
+ 
+  import type { Card, ColorValueHex, GameState } from "./types/Card";
+
+  let piles: Card[][] = [];
+  let drawnCards: Card[] = [];
   let prognosisUsages = 0;
-  let burnedCards = [];
+  let burnedCards: Card[] = [];
   let burnActive = false;
   let prognosisActive = false;
   let gistId = "38d66e7e0ebabeed12db7f2642b61db4";
 
-  const colorMap = {
+  const colorMap: Record<string, ColorValueHex> = {
     black: "#574747",
     red: "#fc5151",
     yellow: "#ffff6e",
@@ -23,7 +27,7 @@
       },
     });
     const data = await response.json();
-    const content = JSON.parse(data.files["deck.json"].content);
+    const content: Card[] = JSON.parse(data.files["deck.json"].content);
     piles = [content];
     drawnCards = [];
     burnedCards = [];
@@ -40,7 +44,7 @@
       },
     });
     const data = await response.json();
-    const content = JSON.parse(data.files["currentGame.json"].content);
+    const content: GameState = JSON.parse(data.files["currentGame.json"].content);
     piles = content.piles;
     burnedCards = content.burnedCards;
     drawnCards = content.drawnCards;
