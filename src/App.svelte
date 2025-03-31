@@ -2,6 +2,7 @@
 <script lang="ts">
  
   import type { Card, ColorValueHex, GameState } from "./types/Card";
+  import { fetchGist, saveGist } from "./services/gistService"
 
   let piles: Card[][] = [];
   let drawnCards: Card[] = [];
@@ -9,7 +10,6 @@
   let burnedCards: Card[] = [];
   let burnActive = false;
   let prognosisActive = false;
-  let gistId = "38d66e7e0ebabeed12db7f2642b61db4";
 
   const colorMap: Record<string, ColorValueHex> = {
     black: "#574747",
@@ -18,42 +18,26 @@
     blue: "#6edbff",
   };
 
-  async function createNewGame() {
-    const response = await fetch(`https://api.github.com/gists/${gistId}`, {
-      method: "GET",
-      headers: {
-        Authorization: `token ${import.meta.env.VITE_GITHUB_PAT}`,
-        "Content-Type": "application/json",
-      },
-    });
-    const data = await response.json();
-    const content: Card[] = JSON.parse(data.files["deck.json"].content);
-    piles = [content];
+  const createNewGame = async () => {
+    const cards = await fetchGist("deck.json") as Card[]
+    piles = [cards];
     drawnCards = [];
     burnedCards = [];
     prognosisUsages = 0;
     prognosisActive = false;
   }
 
-  async function loadCurrentGame() {
-    const response = await fetch(`https://api.github.com/gists/${gistId}`, {
-      method: "GET",
-      headers: {
-        Authorization: `token ${import.meta.env.VITE_GITHUB_PAT}`,
-        "Content-Type": "application/json",
-      },
-    });
-    const data = await response.json();
-    const content: GameState = JSON.parse(data.files["currentGame.json"].content);
-    piles = content.piles;
-    burnedCards = content.burnedCards;
-    drawnCards = content.drawnCards;
+  const loadCurrentGame = async () => {
+    const gameState: GameState = await fetchGist("currentGame.json") as GameState
+    piles = gameState.piles;
+    burnedCards = gameState.burnedCards;
+    drawnCards = gameState.drawnCards;
     prognosisUsages = piles
       .flatMap((list) => [...list])
       .filter((card) => card.prognosed).length;
   }
 
-  async function drawCard(name) {
+  const drawCard = (name) => {
     const pileIndex = piles[piles.length - 1].findIndex(
       (pileCard) => pileCard.name == name,
     );
@@ -65,7 +49,7 @@
     saveToGist();
   }
 
-  async function handleEpidemic(name) {
+  const handleEpidemic = (name) => {
     const infectedIndex = piles[0].findIndex((card) => card.name === name);
     const infectedCard = piles[0].splice(infectedIndex, 1)[0];
     drawnCards.push(infectedCard);
@@ -77,7 +61,7 @@
     saveToGist();
   }
 
-  async function handlePrognosis(name) {
+  const handlePrognosis = (name) => {
     prognosisUsages += 1;
     for (let pileIndex = piles.length - 1; pileIndex >= 0; pileIndex--) {
       const pile = piles[pileIndex];
@@ -96,7 +80,7 @@
     }
   }
 
-  async function handleBurn(name) {
+  const handleBurn = (name) => {
     let discardIndex = drawnCards.findIndex((card) => card.name == name);
     if (discardIndex >= 0) {
       const burnedCard = drawnCards.splice(discardIndex, 1)[0];
@@ -121,21 +105,8 @@
     saveToGist();
   }
 
-  async function saveToGist() {
-    const data = JSON.stringify({ piles, drawnCards, burnedCards });
-    const response = await fetch(`https://api.github.com/gists/${gistId}`, {
-      method: "PATCH",
-      headers: {
-        Authorization: `token ${import.meta.env.VITE_GITHUB_PAT}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        files: { "currentGame.json": { content: data } },
-      }),
-    });
-
-    const result = await response.json();
-    if (!gistId) gistId = result.id;
+  const saveToGist = async () => {
+    await saveGist("currentGame.json", { piles, drawnCards, burnedCards })
   }
 </script>
 
@@ -280,5 +251,6 @@
   }
   .arrow {
     cursor: pointer;
+    
   }
 </style>
